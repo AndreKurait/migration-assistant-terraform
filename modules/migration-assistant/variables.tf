@@ -64,3 +64,22 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# Helm Chart Configuration
+variable "deploy_helm_chart" {
+  description = "Deploy Migration Assistant helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "helm_chart_version" {
+  description = "Helm chart version (git ref). Defaults to latest release."
+  type        = string
+  default     = null
+}
+
+variable "use_public_images" {
+  description = "Use public ECR images instead of building from source"
+  type        = bool
+  default     = true
+}

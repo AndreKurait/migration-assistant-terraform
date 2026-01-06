@@ -192,3 +192,111 @@ resource "aws_eks_pod_identity_association" "main" {
   service_account = each.key
   role_arn        = aws_iam_role.pod_identity.arn
 }
+
+#---------------------------------------------------------------
+# Helm Chart (opt-in)
+#---------------------------------------------------------------
+data "http" "latest_release" {
+  count = var.deploy_helm_chart && var.helm_chart_version == null ? 1 : 0
+  url   = "https://api.github.com/repos/opensearch-project/opensearch-migrations/releases/latest"
+}
+
+locals {
+  helm_version = var.deploy_helm_chart ? (
+    var.helm_chart_version != null ? var.helm_chart_version : jsondecode(data.http.latest_release[0].response_body).tag_name
+  ) : null
+
+  image_tag       = local.helm_version
+  public_ecr_base = "public.ecr.aws/opensearchproject"
+  chart_path      = var.deploy_helm_chart ? "${path.module}/.helm-cache/migrationAssistantWithArgo" : null
+}
+
+resource "terraform_data" "fetch_helm_chart" {
+  count = var.deploy_helm_chart ? 1 : 0
+
+  triggers_replace = [local.helm_version]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      rm -rf ${path.module}/.helm-cache
+      mkdir -p ${path.module}/.helm-cache
+      cd ${path.module}/.helm-cache
+      git clone --depth 1 --branch ${local.helm_version} https://github.com/opensearch-project/opensearch-migrations.git repo
+      cp -r repo/deployment/k8s/charts/aggregates/migrationAssistantWithArgo .
+      rm -rf repo
+    EOT
+  }
+}
+
+resource "helm_release" "migration_assistant" {
+  count = var.deploy_helm_chart ? 1 : 0
+
+  name             = "ma"
+  namespace        = "ma"
+  create_namespace = true
+  chart            = local.chart_path
+  timeout          = 900
+  wait             = false
+
+  values = [
+    yamlencode({
+      stageName = var.stage
+      aws = {
+        configureAwsEksResources = true
+        region                   = local.region
+        account                  = data.aws_caller_identity.current.account_id
+      }
+      cluster = {
+        isEKS = true
+        name  = module.eks.cluster_name
+      }
+      conditionalPackageInstalls = {
+        localstack = false
+        jaeger     = false
+      }
+      defaultBucketConfiguration = {
+        useLocalStack     = false
+        deleteOnUninstall = true
+        emptyBeforeDelete = true
+        endpoint          = ""
+        snapshotRoleArn   = aws_iam_role.snapshot.arn
+      }
+      images = var.use_public_images ? {
+        captureProxy = {
+          repository = "${local.public_ecr_base}/opensearch-migrations-traffic-capture-proxy"
+          tag        = local.image_tag
+        }
+        trafficReplayer = {
+          repository = "${local.public_ecr_base}/opensearch-migrations-traffic-replayer"
+          tag        = local.image_tag
+        }
+        reindexFromSnapshot = {
+          repository = "${local.public_ecr_base}/opensearch-migrations-reindex-from-snapshot"
+          tag        = local.image_tag
+        }
+        migrationConsole = {
+          repository = "${local.public_ecr_base}/opensearch-migrations-console"
+          tag        = local.image_tag
+        }
+        installer = {
+          repository = "${local.public_ecr_base}/opensearch-migrations-console"
+          tag        = local.image_tag
+        }
+      } : {
+        captureProxy        = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_capture_proxy_latest" }
+        trafficReplayer     = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_traffic_replayer_latest" }
+        reindexFromSnapshot = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_reindex_from_snapshot_latest" }
+        migrationConsole    = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_migration_console_latest" }
+        installer           = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_migration_console_latest" }
+      }
+    })
+  ]
+
+  depends_on = [
+    module.eks,
+    aws_eks_pod_identity_association.main,
+    terraform_data.fetch_helm_chart
+  ]
+}
+
+data "aws_caller_identity" "current" {}
