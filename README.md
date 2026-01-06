@@ -44,6 +44,14 @@ module "migration_assistant" {
   eks_public_access = false
   eks_node_pools    = ["general-purpose", "system"]
 
+  # Deploy helm chart (requires helm provider)
+  deploy_helm_chart  = true
+  helm_chart_version = "2.6.1"  # Optional, defaults to latest
+  use_public_images  = true
+
+  # AWS Solutions tracking
+  enable_app_registry = true
+
   tags = {
     Environment = "production"
     Team        = "platform"
@@ -65,6 +73,11 @@ module "migration_assistant" {
 | azs | Availability zones | list(string) | auto |
 | eks_public_access | Enable public endpoint | bool | true |
 | eks_node_pools | Auto Mode node pools | list(string) | ["general-purpose", "system"] |
+| deploy_helm_chart | Deploy Migration Assistant helm chart | bool | false |
+| helm_chart_version | Helm chart version (defaults to latest) | string | null |
+| use_public_images | Use public ECR images | bool | true |
+| enable_app_registry | Enable AWS App Registry for Solutions tracking | bool | true |
+| solution_version | Solution version for App Registry | string | "2.0.0" |
 | tags | Additional tags | map(string) | {} |
 
 ## Outputs
@@ -77,6 +90,16 @@ module "migration_assistant" {
 | ecr_repository_url | ECR repository URL |
 | pod_identity_role_arn | Pod identity role ARN |
 | snapshot_role_arn | OpenSearch snapshot role ARN |
+| app_registry_arn | AWS App Registry application ARN |
+
+## AWS Solutions Tracking
+
+This module integrates with AWS App Registry for Solutions tracking (Solution ID: SO0290). This enables:
+- Tracking all resources deployed by the solution
+- Cost allocation and reporting
+- Centralized resource management
+
+To disable App Registry integration, set `enable_app_registry = false`.
 
 ## Examples
 
