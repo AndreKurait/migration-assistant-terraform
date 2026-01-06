@@ -220,13 +220,8 @@ resource "terraform_data" "download_helm_chart" {
   provisioner "local-exec" {
     command = <<-EOT
       mkdir -p ${path.module}/.helm-cache
-      # Try OCI registry first
-      helm pull oci://public.ecr.aws/opensearchproject/migration-assistant --version ${local.helm_version} -d ${path.module}/.helm-cache 2>/dev/null && \
-        mv ${path.module}/.helm-cache/migration-assistant-*.tgz ${local.chart_path} && exit 0
-      # Try GitHub release
       curl -fsSL -o ${local.chart_path} ${local.chart_url} 2>/dev/null && exit 0
-      # Fallback to git clone
-      echo "Falling back to git clone..."
+      echo "Chart not in release, falling back to git clone..."
       rm -rf ${path.module}/.helm-cache/repo
       git clone --depth 1 --branch ${local.helm_version} https://github.com/opensearch-project/opensearch-migrations.git ${path.module}/.helm-cache/repo
       helm package ${path.module}/.helm-cache/repo/deployment/k8s/charts/aggregates/migrationAssistantWithArgo -d ${path.module}/.helm-cache
