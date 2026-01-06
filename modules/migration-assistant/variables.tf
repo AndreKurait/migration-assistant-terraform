@@ -71,6 +71,12 @@ variable "solution_version" {
   default     = "2.0.0"
 }
 
+variable "enable_app_registry" {
+  description = "Enable AWS App Registry for Solutions tracking"
+  type        = bool
+  default     = true
+}
+
 # Helm Chart Configuration
 variable "deploy_helm_chart" {
   description = "Deploy Migration Assistant helm chart"

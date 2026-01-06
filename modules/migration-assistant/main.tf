@@ -21,6 +21,8 @@ locals {
 # App Registry (AWS Solutions tracking)
 #---------------------------------------------------------------
 resource "aws_servicecatalogappregistry_application" "main" {
+  count = var.enable_app_registry ? 1 : 0
+
   name        = "${var.name}-${local.region}-${local.account_id}-${var.stage}"
   description = "Service Catalog application to track and manage all your resources for the solution ${var.name}"
 
@@ -33,6 +35,8 @@ resource "aws_servicecatalogappregistry_application" "main" {
 }
 
 resource "aws_servicecatalogappregistry_attribute_group" "main" {
+  count = var.enable_app_registry ? 1 : 0
+
   name        = "${local.region}-${var.stage}-attributes"
   description = "Attribute group for solution information"
 
@@ -45,8 +49,10 @@ resource "aws_servicecatalogappregistry_attribute_group" "main" {
 }
 
 resource "aws_servicecatalogappregistry_attribute_group_association" "main" {
-  application = aws_servicecatalogappregistry_application.main.id
-  attribute_group = aws_servicecatalogappregistry_attribute_group.main.id
+  count = var.enable_app_registry ? 1 : 0
+
+  application     = aws_servicecatalogappregistry_application.main[0].id
+  attribute_group = aws_servicecatalogappregistry_attribute_group.main[0].id
 }
 
 #---------------------------------------------------------------

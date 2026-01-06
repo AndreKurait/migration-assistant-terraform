@@ -45,5 +45,5 @@ output "snapshot_role_arn" {
 
 output "app_registry_arn" {
   description = "App Registry application ARN"
-  value       = aws_servicecatalogappregistry_application.main.arn
+  value       = var.enable_app_registry ? aws_servicecatalogappregistry_application.main[0].arn : null
 }
