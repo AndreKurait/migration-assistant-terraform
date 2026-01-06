@@ -21,10 +21,10 @@ provider "aws" {
 }
 
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     host                   = module.migration_assistant.cluster_endpoint
     cluster_ca_certificate = base64decode(module.migration_assistant.cluster_certificate_authority_data)
-    exec {
+    exec = {
       api_version = "client.authentication.k8s.io/v1beta1"
       command     = "aws"
       args        = ["eks", "get-token", "--cluster-name", module.migration_assistant.cluster_name, "--region", var.region]
