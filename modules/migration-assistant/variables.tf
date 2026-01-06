@@ -65,6 +65,12 @@ variable "tags" {
   default     = {}
 }
 
+variable "solution_version" {
+  description = "Solution version for App Registry tracking"
+  type        = string
+  default     = "2.0.0"
+}
+
 # Helm Chart Configuration
 variable "deploy_helm_chart" {
   description = "Deploy Migration Assistant helm chart"

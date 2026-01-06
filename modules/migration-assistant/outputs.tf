@@ -42,3 +42,8 @@ output "snapshot_role_arn" {
   description = "OpenSearch snapshot role ARN"
   value       = aws_iam_role.snapshot.arn
 }
+
+output "app_registry_arn" {
+  description = "App Registry application ARN"
+  value       = aws_servicecatalogappregistry_application.main.arn
+}

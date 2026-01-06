@@ -1,8 +1,10 @@
 data "aws_region" "current" {}
 data "aws_availability_zones" "available" { state = "available" }
+data "aws_caller_identity" "current" {}
 
 locals {
   region       = data.aws_region.current.name
+  account_id   = data.aws_caller_identity.current.account_id
   cluster_name = "ma-${var.stage}-${local.region}"
   azs          = var.azs != null ? var.azs : slice(data.aws_availability_zones.available.names, 0, 2)
 
@@ -13,6 +15,38 @@ locals {
     Project = var.name
     Stage   = var.stage
   })
+}
+
+#---------------------------------------------------------------
+# App Registry (AWS Solutions tracking)
+#---------------------------------------------------------------
+resource "aws_servicecatalogappregistry_application" "main" {
+  name        = "${var.name}-${local.region}-${local.account_id}-${var.stage}"
+  description = "Service Catalog application to track and manage all your resources for the solution ${var.name}"
+
+  tags = {
+    "Solutions:SolutionID"      = "SO0290"
+    "Solutions:SolutionName"    = var.name
+    "Solutions:SolutionVersion" = var.solution_version
+    "Solutions:ApplicationType" = "AWS-Solutions"
+  }
+}
+
+resource "aws_servicecatalogappregistry_attribute_group" "main" {
+  name        = "${local.region}-${var.stage}-attributes"
+  description = "Attribute group for solution information"
+
+  attributes = jsonencode({
+    applicationType = "AWS-Solutions"
+    version         = var.solution_version
+    solutionID      = "SO0290"
+    solutionName    = var.name
+  })
+}
+
+resource "aws_servicecatalogappregistry_attribute_group_association" "main" {
+  application = aws_servicecatalogappregistry_application.main.id
+  attribute_group = aws_servicecatalogappregistry_attribute_group.main.id
 }
 
 #---------------------------------------------------------------
@@ -341,5 +375,3 @@ resource "helm_release" "migration_assistant" {
     terraform_data.download_helm_chart
   ]
 }
-
-data "aws_caller_identity" "current" {}
