@@ -216,56 +216,30 @@ resource "helm_release" "migration_assistant" {
   name             = "ma"
   namespace        = "ma"
   create_namespace = true
-  repository       = "oci://public.ecr.aws/opensearchproject"
-  chart            = "opensearch-migrations"
-  version          = local.helm_version
+  chart            = var.helm_chart_path
   timeout          = 900
   wait             = false
 
   values = [
+    file("${var.helm_chart_path}/valuesEks.yaml"),
     yamlencode({
       stageName = var.stage
       aws = {
-        configureAwsEksResources = true
-        region                   = local.region
-        account                  = data.aws_caller_identity.current.account_id
+        region  = local.region
+        account = data.aws_caller_identity.current.account_id
       }
       cluster = {
-        isEKS = true
-        name  = module.eks.cluster_name
-      }
-      conditionalPackageInstalls = {
-        localstack = false
-        jaeger     = false
+        name = module.eks.cluster_name
       }
       defaultBucketConfiguration = {
-        useLocalStack     = false
-        deleteOnUninstall = true
-        emptyBeforeDelete = true
-        endpoint          = ""
-        snapshotRoleArn   = aws_iam_role.snapshot.arn
+        snapshotRoleArn = aws_iam_role.snapshot.arn
       }
       images = var.use_public_images ? {
-        captureProxy = {
-          repository = "${local.public_ecr_base}/opensearch-migrations-traffic-capture-proxy"
-          tag        = local.image_tag
-        }
-        trafficReplayer = {
-          repository = "${local.public_ecr_base}/opensearch-migrations-traffic-replayer"
-          tag        = local.image_tag
-        }
-        reindexFromSnapshot = {
-          repository = "${local.public_ecr_base}/opensearch-migrations-reindex-from-snapshot"
-          tag        = local.image_tag
-        }
-        migrationConsole = {
-          repository = "${local.public_ecr_base}/opensearch-migrations-console"
-          tag        = local.image_tag
-        }
-        installer = {
-          repository = "${local.public_ecr_base}/opensearch-migrations-console"
-          tag        = local.image_tag
-        }
+        captureProxy        = { repository = "${local.public_ecr_base}/opensearch-migrations-traffic-capture-proxy", tag = local.image_tag }
+        trafficReplayer     = { repository = "${local.public_ecr_base}/opensearch-migrations-traffic-replayer", tag = local.image_tag }
+        reindexFromSnapshot = { repository = "${local.public_ecr_base}/opensearch-migrations-reindex-from-snapshot", tag = local.image_tag }
+        migrationConsole    = { repository = "${local.public_ecr_base}/opensearch-migrations-console", tag = local.image_tag }
+        installer           = { repository = "${local.public_ecr_base}/opensearch-migrations-console", tag = local.image_tag }
       } : {
         captureProxy        = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_capture_proxy_latest" }
         trafficReplayer     = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_traffic_replayer_latest" }

@@ -49,12 +49,19 @@ variable "deploy_helm_chart" {
   default     = false
 }
 
+variable "helm_chart_path" {
+  description = "Path to local helm chart (clone opensearch-migrations repo first)"
+  type        = string
+  default     = null
+}
+
 module "migration_assistant" {
   source = "github.com/AndreKurait/migration-assistant-terraform//modules/migration-assistant"
 
   stage             = var.stage
   create_vpc        = true
   deploy_helm_chart = var.deploy_helm_chart
+  helm_chart_path   = var.helm_chart_path
 
   tags = {
     Environment = var.stage
