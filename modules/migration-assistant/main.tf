@@ -208,24 +208,6 @@ locals {
 
   image_tag       = local.helm_version
   public_ecr_base = "public.ecr.aws/opensearchproject"
-  chart_path      = var.deploy_helm_chart ? "${path.module}/.helm-cache/migrationAssistantWithArgo" : null
-}
-
-resource "terraform_data" "fetch_helm_chart" {
-  count = var.deploy_helm_chart ? 1 : 0
-
-  triggers_replace = [local.helm_version]
-
-  provisioner "local-exec" {
-    command = <<-EOT
-      rm -rf ${path.module}/.helm-cache
-      mkdir -p ${path.module}/.helm-cache
-      cd ${path.module}/.helm-cache
-      git clone --depth 1 --branch ${local.helm_version} https://github.com/opensearch-project/opensearch-migrations.git repo
-      cp -r repo/deployment/k8s/charts/aggregates/migrationAssistantWithArgo .
-      rm -rf repo
-    EOT
-  }
 }
 
 resource "helm_release" "migration_assistant" {
@@ -234,7 +216,9 @@ resource "helm_release" "migration_assistant" {
   name             = "ma"
   namespace        = "ma"
   create_namespace = true
-  chart            = local.chart_path
+  repository       = "oci://public.ecr.aws/opensearchproject"
+  chart            = "opensearch-migrations"
+  version          = local.helm_version
   timeout          = 900
   wait             = false
 
@@ -294,8 +278,7 @@ resource "helm_release" "migration_assistant" {
 
   depends_on = [
     module.eks,
-    aws_eks_pod_identity_association.main,
-    terraform_data.fetch_helm_chart
+    aws_eks_pod_identity_association.main
   ]
 }
 
