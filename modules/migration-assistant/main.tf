@@ -208,6 +208,28 @@ locals {
 
   image_tag       = local.helm_version
   public_ecr_base = "public.ecr.aws/opensearchproject"
+  chart_url       = var.deploy_helm_chart ? "https://github.com/opensearch-project/opensearch-migrations/releases/download/${local.helm_version}/migration-assistant-${local.helm_version}.tgz" : null
+  chart_path      = var.deploy_helm_chart ? "${path.module}/.helm-cache/migration-assistant-${local.helm_version}.tgz" : null
+}
+
+resource "terraform_data" "download_helm_chart" {
+  count = var.deploy_helm_chart ? 1 : 0
+
+  triggers_replace = [local.helm_version]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      mkdir -p ${path.module}/.helm-cache
+      curl -fsSL -o ${local.chart_path} ${local.chart_url} || {
+        echo "Chart not found in release, falling back to git clone..."
+        rm -rf ${path.module}/.helm-cache/repo
+        git clone --depth 1 --branch ${local.helm_version} https://github.com/opensearch-project/opensearch-migrations.git ${path.module}/.helm-cache/repo
+        helm package ${path.module}/.helm-cache/repo/deployment/k8s/charts/aggregates/migrationAssistantWithArgo -d ${path.module}/.helm-cache
+        mv ${path.module}/.helm-cache/migration-assistant-*.tgz ${local.chart_path}
+        rm -rf ${path.module}/.helm-cache/repo
+      }
+    EOT
+  }
 }
 
 resource "helm_release" "migration_assistant" {
@@ -216,23 +238,31 @@ resource "helm_release" "migration_assistant" {
   name             = "ma"
   namespace        = "ma"
   create_namespace = true
-  chart            = var.helm_chart_path
+  chart            = local.chart_path
   timeout          = 900
   wait             = false
 
   values = [
-    file("${var.helm_chart_path}/valuesEks.yaml"),
     yamlencode({
       stageName = var.stage
       aws = {
-        region  = local.region
-        account = data.aws_caller_identity.current.account_id
+        configureAwsEksResources = true
+        region                   = local.region
+        account                  = data.aws_caller_identity.current.account_id
       }
       cluster = {
-        name = module.eks.cluster_name
+        isEKS = true
+        name  = module.eks.cluster_name
+      }
+      conditionalPackageInstalls = {
+        localstack = false
+        jaeger     = false
       }
       defaultBucketConfiguration = {
-        snapshotRoleArn = aws_iam_role.snapshot.arn
+        useLocalStack     = false
+        deleteOnUninstall = true
+        emptyBeforeDelete = true
+        snapshotRoleArn   = aws_iam_role.snapshot.arn
       }
       images = var.use_public_images ? {
         captureProxy        = { repository = "${local.public_ecr_base}/opensearch-migrations-traffic-capture-proxy", tag = local.image_tag }
@@ -252,7 +282,8 @@ resource "helm_release" "migration_assistant" {
 
   depends_on = [
     module.eks,
-    aws_eks_pod_identity_association.main
+    aws_eks_pod_identity_association.main,
+    terraform_data.download_helm_chart
   ]
 }
 

@@ -72,14 +72,8 @@ variable "deploy_helm_chart" {
   default     = false
 }
 
-variable "helm_chart_path" {
-  description = "Path to local helm chart directory (clone opensearch-migrations repo and set to deployment/k8s/charts/aggregates/migrationAssistantWithArgo)"
-  type        = string
-  default     = null
-}
-
 variable "helm_chart_version" {
-  description = "Image tag version for public images. Defaults to latest release."
+  description = "Helm chart version (git tag). Defaults to latest release."
   type        = string
   default     = null
 }
