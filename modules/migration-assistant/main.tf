@@ -120,26 +120,82 @@ resource "aws_iam_role" "pod_identity" {
   tags = local.tags
 }
 
-resource "aws_iam_role_policy_attachment" "pod_identity_ecr" {
-  role       = aws_iam_role.pod_identity.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
-}
-
 resource "aws_iam_role_policy" "pod_identity" {
   name = "MigrationsPodPolicy"
   role = aws_iam_role.pod_identity.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = ["aoss:APIAccessAll", "es:ESHttp*", "elasticfilesystem:Client*", "logs:*", "s3:*", "secretsmanager:*", "xray:Put*"]
-      Resource = "*"
-    }, {
-      Effect   = "Allow"
-      Action   = "iam:PassRole"
-      Resource = aws_iam_role.snapshot.arn
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken",
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:DescribeRepositories",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:CompleteLayerUpload",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["es:ESHttp*", "aoss:APIAccessAll"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret", "secretsmanager:ListSecrets"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket",
+          "s3:ListAllMyBuckets",
+          "s3:DeleteObject",
+          "s3:DeleteObjectVersion",
+          "s3:ListBucketVersions",
+          "s3:ListBucketMultipartUploads",
+          "s3:AbortMultipartUpload",
+          "s3:CreateBucket",
+          "s3:DeleteBucket"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams",
+          "logs:DescribeLogGroups",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*"
+      }
+    ]
   })
 }
 
