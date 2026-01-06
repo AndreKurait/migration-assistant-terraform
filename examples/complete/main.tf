@@ -9,17 +9,28 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-2"
+  region = var.region
+}
+
+variable "region" {
+  description = "AWS region"
+  type        = string
+}
+
+variable "stage" {
+  description = "Stage identifier"
+  type        = string
+  default     = "dev"
 }
 
 module "migration_assistant" {
   source = "github.com/AndreKurait/migration-assistant-terraform//modules/migration-assistant"
 
-  stage      = "dev"
+  stage      = var.stage
   create_vpc = true
 
   tags = {
-    Environment = "dev"
+    Environment = var.stage
     ManagedBy   = "terraform"
   }
 }
@@ -37,5 +48,5 @@ output "vpc_id" {
 }
 
 output "kubectl_config" {
-  value = "aws eks update-kubeconfig --name ${module.migration_assistant.cluster_name} --region us-east-2"
+  value = "aws eks update-kubeconfig --name ${module.migration_assistant.cluster_name} --region ${var.region}"
 }
