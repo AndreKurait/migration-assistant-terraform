@@ -51,8 +51,8 @@ resource "aws_servicecatalogappregistry_attribute_group" "main" {
 resource "aws_servicecatalogappregistry_attribute_group_association" "main" {
   count = var.enable_app_registry ? 1 : 0
 
-  application     = aws_servicecatalogappregistry_application.main[0].id
-  attribute_group = aws_servicecatalogappregistry_attribute_group.main[0].id
+  application_id     = aws_servicecatalogappregistry_application.main[0].id
+  attribute_group_id = aws_servicecatalogappregistry_attribute_group.main[0].id
 }
 
 #---------------------------------------------------------------
