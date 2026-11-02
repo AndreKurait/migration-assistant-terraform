@@ -9,7 +9,7 @@ import unittest
 
 SCRIPT = Path(__file__).resolve().parents[1] / "modules/migration-assistant/scripts/fetch-chart.sh"
 STUB = r"""#!/usr/bin/env python3
-import json, os, pathlib, sys
+import json, os, pathlib, sys, time
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with open(os.environ["COMMAND_LOG"], "a") as log:
@@ -20,6 +20,8 @@ if name == "curl":
     sys.exit(int(os.environ.get("CURL_EXIT", "0")))
 elif name == "git":
     pathlib.Path(args[-1]).mkdir()
+    time.sleep(float(os.environ.get("GIT_DELAY", "0")))
+    sys.exit(int(os.environ.get("GIT_EXIT", "0")))
 elif args[0] == "package":
     sys.exit_code = int(os.environ.get("PACKAGE_EXIT", "0"))
     if sys.exit_code:
@@ -60,7 +62,7 @@ class FetchChartTest(unittest.TestCase):
             **values,
         }
         result = subprocess.run(["bash", str(SCRIPT)], env=env, cwd=self.root,
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, timeout=15)
         self.assertFalse((self.root / "injected").exists())
         self.assertEqual(list(self.cache.glob(".download.*")), [])
         return result
@@ -88,6 +90,18 @@ class FetchChartTest(unittest.TestCase):
                 self.assertNotEqual(self.run_fetch(**settings).returncode, 0)
                 self.assertEqual(self.target.read_text(), "existing-chart")
                 self.assertEqual(self.commands(), ["curl"])
+
+    def test_source_clone_failure_and_timeout_preserve_cache_without_packaging(self):
+        for settings in ({"GIT_EXIT": "17"},
+                         {"GIT_DELAY": "30", "CHART_SOURCE_TIMEOUT_SECONDS": "0.2"}):
+            with self.subTest(settings=settings):
+                self.log.unlink(missing_ok=True)
+                result = self.run_fetch(HTTP_STATUS="404", **settings)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.target.read_text(), "existing-chart")
+                self.assertEqual(self.commands(), ["curl", "git"])
+                if "GIT_DELAY" in settings:
+                    self.assertIn("Source clone exceeded", result.stderr)
 
     def test_invalid_chart_and_packaging_failures_preserve_cache(self):
         for settings in ({"SHOW_EXIT": "1"}, {"HTTP_STATUS": "404", "PACKAGE_EXIT": "1"}):

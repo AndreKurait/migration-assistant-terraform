@@ -22,8 +22,38 @@ case "$status" in
   200) ;;
   404)
     echo "Release has no packaged chart; packaging the exact source tag."
-    git clone --depth 1 --branch "$version" \
-      https://github.com/opensearch-project/opensearch-migrations.git "$work_dir/repo"
+    # Bound the complete clone, including Git's transport children, on macOS
+    # and Linux without requiring GNU timeout.
+    python3 - "$version" "$work_dir/repo" <<'PY'
+import math
+import os
+import signal
+import subprocess
+import sys
+
+try:
+    timeout = float(os.environ.get("CHART_SOURCE_TIMEOUT_SECONDS", "120"))
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError
+except ValueError:
+    sys.exit("CHART_SOURCE_TIMEOUT_SECONDS must be a positive finite number")
+
+process = subprocess.Popen(
+    ["git", "clone", "--depth", "1", "--branch", sys.argv[1],
+     "https://github.com/opensearch-project/opensearch-migrations.git", sys.argv[2]],
+    env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
+    start_new_session=True,
+)
+try:
+    sys.exit(process.wait(timeout=timeout))
+except subprocess.TimeoutExpired:
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait()
+    sys.exit(f"Source clone exceeded {timeout:g} seconds; existing cache preserved")
+PY
     mkdir "$work_dir/packages"
     helm package "$work_dir/repo/deployment/k8s/charts/aggregates/migrationAssistantWithArgo" \
       --destination "$work_dir/packages"

@@ -139,10 +139,13 @@ infrastructure. The Python tests replace `curl`, `git`, and `helm` with local
 stubs and make no network or AWS requests.
 
 When `deploy_helm_chart` is enabled, the machine running Terraform needs Bash,
-curl, Git, and Helm. The fetcher validates the release tag, stages downloads in
+curl, Git, Python 3, and Helm. The fetcher validates the release tag, stages downloads in
 a temporary directory, and replaces the cached chart only after `helm show chart`
 accepts it. A missing release asset (HTTP 404) triggers packaging from that source
 tag; transport errors, server errors, and packaging failures stop the operation.
+Downloads and fallback source clones each have a 120-second limit. Override the
+clone limit with `CHART_SOURCE_TIMEOUT_SECONDS` if needed; timeout terminates
+the clone and its transport processes without replacing the existing cache.
 This verifies chart readability, not artifact signatures or deployment compatibility.
 
 ## Architecture
