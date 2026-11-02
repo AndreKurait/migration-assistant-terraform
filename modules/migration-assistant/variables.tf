@@ -88,6 +88,11 @@ variable "helm_chart_version" {
   description = "Helm chart version (git tag). Defaults to latest release."
   type        = string
   default     = null
+
+  validation {
+    condition     = var.helm_chart_version == null ? true : can(regex("^v?[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$", var.helm_chart_version))
+    error_message = "helm_chart_version must be a release tag such as 2.6.1 or v2.6.1-rc.1."
+  }
 }
 
 variable "use_public_images" {

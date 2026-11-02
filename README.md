@@ -2,13 +2,30 @@
 
 Reusable Terraform module for deploying Migration Assistant for Amazon OpenSearch Service infrastructure.
 
+**Status: experimental infrastructure module.** Local validation and mocked
+chart-download tests do not establish a working deployment or production-ready
+permissions. Pin a reviewed Git revision when consuming the module; the examples
+below follow the repository's default branch.
+
+Review these existing defaults before applying:
+
+- The pod role grants broad access to S3, Secrets Manager, OpenSearch, EFS, and
+  other services, including `iam:PassRole` across the account. Scope permissions
+  to the resources and workflows you need.
+- The EKS endpoint is public by default, and the cluster creator receives admin
+  permissions. Configure endpoint access and administration for your environment.
+- ECR uses `force_delete`; Helm values enable bucket emptying/deletion on
+  uninstall. Review data retention before destroying or uninstalling anything.
+- Selecting the latest Helm release is not reproducible. Set
+  `helm_chart_version` explicitly for a reviewed deployment.
+
 ## Usage
 
 ### Basic - Create New VPC
 
 ```hcl
 module "migration_assistant" {
-  source = "github.com/your-org/migration-assistant-terraform//modules/migration-assistant"
+  source = "github.com/AndreKurait/migration-assistant-terraform//modules/migration-assistant"
 
   stage = "dev"
 }
@@ -18,7 +35,7 @@ module "migration_assistant" {
 
 ```hcl
 module "migration_assistant" {
-  source = "github.com/your-org/migration-assistant-terraform//modules/migration-assistant"
+  source = "github.com/AndreKurait/migration-assistant-terraform//modules/migration-assistant"
 
   stage      = "prod"
   create_vpc = false
@@ -31,7 +48,7 @@ module "migration_assistant" {
 
 ```hcl
 module "migration_assistant" {
-  source = "github.com/your-org/migration-assistant-terraform//modules/migration-assistant"
+  source = "github.com/AndreKurait/migration-assistant-terraform//modules/migration-assistant"
 
   name           = "my-migration"
   stage          = "prod"
@@ -103,7 +120,30 @@ To disable App Registry integration, set `enable_app_registry = false`.
 
 ## Examples
 
-See [examples/complete](./examples/complete) for a working example.
+See [examples/complete](./examples/complete) for a configuration example. It
+requires AWS credentials and a Helm provider that can reach the resulting
+cluster; it is not an offline deployment test.
+
+## Local validation
+
+```sh
+terraform fmt -check -recursive
+python3 -m unittest discover -s tests -v
+shellcheck modules/migration-assistant/scripts/fetch-chart.sh
+terraform -chdir=modules/migration-assistant init -backend=false
+terraform -chdir=modules/migration-assistant validate
+```
+
+Initialization downloads public modules/providers; validation does not apply
+infrastructure. The Python tests replace `curl`, `git`, and `helm` with local
+stubs and make no network or AWS requests.
+
+When `deploy_helm_chart` is enabled, the machine running Terraform needs Bash,
+curl, Git, and Helm. The fetcher validates the release tag, stages downloads in
+a temporary directory, and replaces the cached chart only after `helm show chart`
+accepts it. A missing release asset (HTTP 404) triggers packaging from that source
+tag; transport errors, server errors, and packaging failures stop the operation.
+This verifies chart readability, not artifact signatures or deployment compatibility.
 
 ## Architecture
 
