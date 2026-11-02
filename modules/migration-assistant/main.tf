@@ -304,26 +304,21 @@ locals {
 
   image_tag       = local.helm_version
   public_ecr_base = "public.ecr.aws/opensearchproject"
-  chart_url       = var.deploy_helm_chart ? "https://github.com/opensearch-project/opensearch-migrations/releases/download/${local.helm_version}/migration-assistant-${local.helm_version}.tgz" : null
   chart_path      = var.deploy_helm_chart ? "${path.module}/.helm-cache/migration-assistant-${local.helm_version}.tgz" : null
 }
 
 resource "terraform_data" "download_helm_chart" {
   count = var.deploy_helm_chart ? 1 : 0
 
-  triggers_replace = [local.helm_version]
+  triggers_replace = [local.helm_version, filesha256("${path.module}/scripts/fetch-chart.sh")]
 
   provisioner "local-exec" {
-    command = <<-EOT
-      mkdir -p ${path.module}/.helm-cache
-      curl -fsSL -o ${local.chart_path} ${local.chart_url} 2>/dev/null && exit 0
-      echo "Chart not in release, falling back to git clone..."
-      rm -rf ${path.module}/.helm-cache/repo
-      git clone --depth 1 --branch ${local.helm_version} https://github.com/opensearch-project/opensearch-migrations.git ${path.module}/.helm-cache/repo
-      helm package ${path.module}/.helm-cache/repo/deployment/k8s/charts/aggregates/migrationAssistantWithArgo -d ${path.module}/.helm-cache
-      mv ${path.module}/.helm-cache/migration-assistant-*.tgz ${local.chart_path}
-      rm -rf ${path.module}/.helm-cache/repo
-    EOT
+    command = "bash \"$CHART_FETCH_SCRIPT\""
+    environment = {
+      CHART_FETCH_SCRIPT = abspath("${path.module}/scripts/fetch-chart.sh")
+      CHART_CACHE_DIR    = abspath("${path.module}/.helm-cache")
+      CHART_VERSION      = local.helm_version
+    }
   }
 }
 
@@ -365,7 +360,7 @@ resource "helm_release" "migration_assistant" {
         reindexFromSnapshot = { repository = "${local.public_ecr_base}/opensearch-migrations-reindex-from-snapshot", tag = local.image_tag }
         migrationConsole    = { repository = "${local.public_ecr_base}/opensearch-migrations-console", tag = local.image_tag }
         installer           = { repository = "${local.public_ecr_base}/opensearch-migrations-console", tag = local.image_tag }
-      } : {
+        } : {
         captureProxy        = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_capture_proxy_latest" }
         trafficReplayer     = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_traffic_replayer_latest" }
         reindexFromSnapshot = { repository = aws_ecr_repository.main.repository_url, tag = "migrations_reindex_from_snapshot_latest" }
