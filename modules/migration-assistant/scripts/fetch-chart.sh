@@ -16,7 +16,8 @@ archive="$work_dir/chart.tgz"
 url="https://github.com/opensearch-project/opensearch-migrations/releases/download/$version/migration-assistant-$version.tgz"
 
 # Transport errors and server errors must not silently switch the source.
-status=$(curl --silent --show-error --location --output "$archive" --write-out '%{http_code}' "$url")
+status=$(curl --silent --show-error --location --connect-timeout 10 --max-time 120 \
+  --output "$archive" --write-out '%{http_code}' "$url")
 case "$status" in
   200) ;;
   404)

@@ -1,0 +1,27 @@
+name: Validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python3 -m unittest discover -s tests -v
+      - run: shellcheck modules/migration-assistant/scripts/fetch-chart.sh
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+      - run: terraform fmt -check -recursive
+      - run: terraform -chdir=modules/migration-assistant init -backend=false -input=false
+      - run: terraform -chdir=modules/migration-assistant validate
